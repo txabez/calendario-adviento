@@ -1,0 +1,23 @@
+/*
+ * Tema "blanco-azul": fondo blanco y letras azules.
+ */
+@import url('https://fonts.googleapis.com/css2?family=Josefin+Sans:wght@300;400;600&display=swap');
+
+:root {
+  /* Colores */
+  --color-bg: #ffffff;
+  --color-surface: #f1f5fc;
+  --color-text: #1d4ed8;
+  --color-text-soft: #3a5ba0;
+  --color-accent: #0b2f8a;
+  --color-border: #1d4ed840;
+
+  /* Tipografías */
+  --font-title: 'Josefin Sans', system-ui, sans-serif;
+  --font-body: 'Josefin Sans', system-ui, sans-serif;
+
+  /* Efectos */
+  --glow: 0 0 10px #1d4ed833;
+
+  color-scheme: light;
+}

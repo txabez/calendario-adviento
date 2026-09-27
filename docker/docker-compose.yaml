@@ -1,0 +1,70 @@
+name: adviento
+
+services:
+  db:
+    image: postgres:17-alpine
+    container_name: adviento-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-adviento}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-adviento}
+      POSTGRES_DB: ${POSTGRES_DB:-adviento}
+    ports:
+      - "5432:5432"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - adviento
+
+  backend:
+    build:
+      context: ../backend
+      dockerfile: ../docker/backend/Dockerfile
+    container_name: adviento-backend
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-adviento}:${POSTGRES_PASSWORD:-adviento}@db:5432/${POSTGRES_DB:-adviento}
+      CORS_ORIGINS: http://localhost:5173
+    ports:
+      - "8000:8000"
+    volumes:
+      - ../backend:/app
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - adviento
+
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: ../docker/frontend/Dockerfile
+    container_name: adviento-frontend
+    restart: unless-stopped
+    environment:
+      # Destino del proxy /api de Vite (comunicación entre contenedores)
+      API_PROXY_TARGET: http://backend:8000
+      # Tema visual: nombre de un fichero de frontend/src/styles/themes/ (sin .css)
+      THEME: ${THEME:-negro-naranja}
+    ports:
+      - "5173:5173"
+    volumes:
+      - ../frontend:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+    networks:
+      - adviento
+
+networks:
+  adviento:
+    name: adviento
+    driver: bridge
+
+volumes:
+  db-data:

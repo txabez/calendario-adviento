@@ -1,0 +1,27 @@
+/*
+ * Tema "negro-naranja": fondo negro y letras naranjas.
+ *
+ * Cada tema solo define colores, tipografías y efectos. Para crear uno nuevo,
+ * copia este fichero con otro nombre (solo minúsculas, números y guiones) y
+ * cambia los valores.
+ */
+@import url('https://fonts.googleapis.com/css2?family=Josefin+Sans:wght@300;400;600&display=swap');
+
+:root {
+  /* Colores */
+  --color-bg: #000000;        /* fondo */
+  --color-surface: #140a05;   /* fondo de casillas y campos */
+  --color-text: #ff8c1a;      /* texto principal y títulos */
+  --color-text-soft: #ffb366; /* párrafos y textos secundarios */
+  --color-accent: #ff5e00;    /* errores, días bloqueados, destacados */
+  --color-border: #ff8c1a55;  /* bordes y separadores */
+
+  /* Tipografías */
+  --font-title: 'Josefin Sans', system-ui, sans-serif;
+  --font-body: 'Josefin Sans', system-ui, sans-serif;
+
+  /* Efectos */
+  --glow: 0 0 12px #ff8c1a66; /* brillo de títulos y botones */
+
+  color-scheme: dark;
+}
