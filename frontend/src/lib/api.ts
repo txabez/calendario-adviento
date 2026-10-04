@@ -166,6 +166,7 @@ export type ChallengeStatus = 'success' | 'fail' | 'ignore'
 export interface ChallengeGame {
   title: string
   intro: string
+  closing: string | null
   challenges: { id: string; status: ChallengeStatus | null }[]
 }
 

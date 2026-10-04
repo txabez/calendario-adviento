@@ -213,6 +213,8 @@ def validate_challenges(data):
     for field in ("title", "intro"):
         if not is_text(data.get(field)):
             errors.append(f"falta '{field}'")
+    if data.get("closing") is not None and not is_text(data["closing"]):
+        errors.append("'closing' debe ser un texto")
 
     challenges = data.get("challenges")
     if not isinstance(challenges, list) or not challenges:
@@ -249,10 +251,11 @@ def load_challenges(text):
 
     with connect() as conn:
         conn.execute("DELETE FROM challenges_page")
-        for key in ("title", "intro"):
-            conn.execute(
-                "INSERT INTO challenges_page (key, value) VALUES (%s, %s)", (key, data[key].strip())
-            )
+        for key in ("title", "intro", "closing"):
+            if data.get(key):
+                conn.execute(
+                    "INSERT INTO challenges_page (key, value) VALUES (%s, %s)", (key, data[key].strip())
+                )
         for position, (challenge_id, challenge) in enumerate(zip(ids, challenges), start=1):
             conn.execute(
                 """

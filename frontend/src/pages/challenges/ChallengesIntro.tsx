@@ -38,6 +38,7 @@ export default function ChallengesIntro() {
           </Link>
         </Button>
       </FadeIn>
+
     </Page>
   )
 }

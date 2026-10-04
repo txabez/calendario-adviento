@@ -10,6 +10,8 @@ export const STATUSES: {
   text: string
   border: string
   fill: string
+  // Si se pide confirmación antes de marcarlo: pregunta del diálogo
+  confirm?: string
 }[] = [
   {
     value: 'success',
@@ -28,6 +30,7 @@ export const STATUSES: {
     text: 'text-destructive',
     border: 'border-destructive',
     fill: 'bg-destructive text-background hover:bg-destructive/90',
+    confirm: '¿Seguro que la prueba ha fallado?',
   },
   {
     value: 'ignore',
@@ -37,6 +40,7 @@ export const STATUSES: {
     text: 'text-muted-foreground',
     border: 'border-muted-foreground/50',
     fill: 'bg-muted-foreground text-background hover:bg-muted-foreground/90',
+    confirm: '¿Seguro que quieres ignorar esta prueba?',
   },
 ]
 

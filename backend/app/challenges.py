@@ -12,8 +12,8 @@ router = APIRouter(prefix="/api/challenges", tags=["Pruebas"])
 
 @router.get("", summary="Juego de pruebas")
 def get_challenges(token: str = Depends(player_token)):
-    """Título, explicación y lista de pruebas (en orden) con su estado en esta sesión
-    de jugador (null si no se ha marcado o no hay sesión)."""
+    """Título, explicación, cierre (opcional) y lista de pruebas (en orden) con su estado
+    en esta sesión de jugador (null si no se ha marcado o no hay sesión)."""
     with connect() as conn:
         session_id = find_session(conn, token)
         page = {
@@ -31,7 +31,12 @@ def get_challenges(token: str = Depends(player_token)):
         ).fetchall()
     if not page:
         raise HTTPException(status_code=404, detail="Juego de pruebas sin contenido")
-    return {"title": page.get("title"), "intro": page.get("intro"), "challenges": challenges}
+    return {
+        "title": page.get("title"),
+        "intro": page.get("intro"),
+        "closing": page.get("closing"),
+        "challenges": challenges,
+    }
 
 
 @router.get("/{challenge_id}", summary="Una prueba")

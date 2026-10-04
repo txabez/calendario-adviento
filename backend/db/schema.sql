@@ -80,7 +80,7 @@ CREATE TABLE IF NOT EXISTS session_days (
 
 -- Juego de pruebas (se carga desde data/challenges.yaml con "Cargar pruebas" en admin.html)
 
--- Textos de la página principal del juego, en filas clave-valor: title, intro
+-- Textos de la página principal del juego, en filas clave-valor: title, intro, closing
 CREATE TABLE IF NOT EXISTS challenges_page (
     key   TEXT PRIMARY KEY,
     value TEXT NOT NULL

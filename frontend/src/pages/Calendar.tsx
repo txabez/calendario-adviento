@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { motion } from 'motion/react'
-import { Lock, LockOpen } from 'lucide-react'
+import { ChevronLeft, Lock, LockOpen } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import { Page, PageTitle } from '@/components/Page'
 import { fetchDays, type DayStatus } from '@/lib/api'
 import { cn } from '@/lib/utils'
@@ -30,6 +31,11 @@ export default function Calendar() {
 
   return (
     <Page>
+      <Button asChild variant="ghost" className="self-start text-muted-foreground">
+        <Link to="/">
+          <ChevronLeft /> Inicio
+        </Link>
+      </Button>
       <PageTitle title="Calendario Adviento" subtitle="20 aniversario" />
 
       {/* Progreso */}

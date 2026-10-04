@@ -172,6 +172,8 @@ Se carga desde el panel con **Cargar pruebas**.
 title: Juego de pruebas
 intro: >
   Explicación del juego. Admite **negrita**.
+closing: >                      # opcional: se muestra al pulsar "Terminar" en la lista de pruebas
+  Cierre del juego (por ejemplo, qué pasa al terminar).
 
 challenges:                     # tantas pruebas como quieras, en este orden
   - id: 1                       # número o texto corto (sin "/"); se muestra en el botón

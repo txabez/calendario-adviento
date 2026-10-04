@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
 import { ChevronLeft, Loader2 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import { Confetti } from '@/components/Confetti'
+import { ConfirmButton } from '@/components/ConfirmButton'
+import { RichText } from '@/components/RichText'
 import {
   NoSessionError,
   fetchChallenge,
@@ -23,7 +24,7 @@ export default function Challenge() {
   const [challenge, setChallenge] = useState<ChallengeData | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
-  const [burst, setBurst] = useState(0)
+  const navigate = useNavigate()
   const { requireConsent } = useConsent()
 
   useEffect(() => {
@@ -38,12 +39,11 @@ export default function Challenge() {
     setSaving(true)
     try {
       await setChallengeStatus(id, status)
-      setChallenge((c) => (c ? { ...c, status } : c))
-      if (status === 'success') setBurst((b) => b + 1)
+      // Marcado el resultado, se cierra la prueba y se vuelve a la lista
+      navigate('/pruebas/lista')
     } catch (e) {
       if (e instanceof NoSessionError) requireConsent()
       else setError((e as Error).message)
-    } finally {
       setSaving(false)
     }
   }
@@ -64,7 +64,6 @@ export default function Challenge() {
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
         >
-          <Confetti burst={burst} />
           <Card className="w-full py-0">
             <CardContent className="flex flex-col items-center gap-6 px-6 py-10 text-center">
               <h1 className="font-display text-3xl tracking-[0.15em] uppercase">Prueba {id}</h1>
@@ -74,7 +73,9 @@ export default function Challenge() {
 
               {challenge && (
                 <>
-                  <p className="text-lg leading-relaxed whitespace-pre-line">{challenge.description}</p>
+                  <p className="text-lg leading-relaxed whitespace-pre-line">
+                    <RichText text={challenge.description} />
+                  </p>
 
                   <AnimatePresence mode="wait">
                     <motion.div
@@ -96,18 +97,37 @@ export default function Challenge() {
                   <div className="grid w-full grid-cols-3 gap-2">
                     {STATUSES.map((s) => {
                       const active = challenge.status === s.value
-                      return (
-                        <Button
-                          key={s.value}
-                          type="button"
-                          variant="outline"
-                          className={cn('h-12 flex-col gap-0.5 text-xs', active ? cn(s.fill, 'border-transparent shadow-glow') : cn(s.text, s.border))}
-                          onClick={() => mark(s.value)}
-                          disabled={saving}
-                          aria-pressed={active}
-                        >
+                      const props = {
+                        type: 'button' as const,
+                        variant: 'outline' as const,
+                        className: cn(
+                          'h-12 flex-col gap-0.5 text-xs',
+                          active ? cn(s.fill, 'border-transparent shadow-glow') : cn(s.text, s.border),
+                        ),
+                        disabled: saving,
+                        'aria-pressed': active,
+                      }
+                      const content = (
+                        <>
                           <s.icon />
                           {s.button}
+                        </>
+                      )
+                      // Fallida e Ignorar piden confirmación; Superada se marca directamente
+                      return s.confirm ? (
+                        <ConfirmButton
+                          key={s.value}
+                          {...props}
+                          title={s.confirm}
+                          description={`La prueba ${id} quedará marcada como ${s.label.toLowerCase()}. Podrás cambiarlo después si vuelves a entrar.`}
+                          confirmLabel={s.button}
+                          onConfirm={() => mark(s.value)}
+                        >
+                          {content}
+                        </ConfirmButton>
+                      ) : (
+                        <Button key={s.value} {...props} onClick={() => mark(s.value)}>
+                          {content}
                         </Button>
                       )
                     })}
