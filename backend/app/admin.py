@@ -3,7 +3,7 @@ from pydantic import BaseModel
 
 from app.auth import admin_token, create_session, require_admin
 from app.db import MAX_ATTEMPTS, connect
-from app.loaders import YamlError, load_days, load_welcome
+from app.loaders import YamlError, load_challenges, load_days, load_welcome
 
 router = APIRouter(prefix="/api/admin", tags=["Administración"])
 
@@ -111,6 +111,30 @@ def close_player(session_id: int, username: str = Depends(require_admin)):
     return {"ok": True}
 
 
+@router.get("/challenges", summary="Resumen del juego de pruebas")
+def challenges_summary(username: str = Depends(require_admin)):
+    """Número de pruebas y cuántas hay en cada estado."""
+    with connect() as conn:
+        row = conn.execute(
+            """
+            SELECT count(*) AS total,
+                   count(*) FILTER (WHERE r.status = 'success') AS success,
+                   count(*) FILTER (WHERE r.status = 'fail') AS fail,
+                   count(*) FILTER (WHERE r.status = 'ignore') AS ignore
+            FROM challenges c LEFT JOIN challenge_results r ON r.challenge_id = c.id
+            """
+        ).fetchone()
+    return {**row, "pending": row["total"] - row["success"] - row["fail"] - row["ignore"]}
+
+
+@router.post("/challenges/reset", summary="Resetear el estado de las pruebas")
+def reset_challenges(username: str = Depends(require_admin)):
+    """Borra el estado de todas las pruebas: vuelven a estar pendientes."""
+    with connect() as conn:
+        reset = conn.execute("DELETE FROM challenge_results").rowcount
+    return {"reset": reset}
+
+
 @router.post("/days/upload", summary="Cargar días (YAML)")
 def upload_days(body: YamlUpload, username: str = Depends(require_admin)):
     """Carga los días desde el contenido de un YAML (como data/days.yaml)."""
@@ -121,3 +145,10 @@ def upload_days(body: YamlUpload, username: str = Depends(require_admin)):
 def upload_welcome(body: YamlUpload, username: str = Depends(require_admin)):
     """Carga la bienvenida desde el contenido de un YAML (como data/welcome.yaml)."""
     return run_loader(load_welcome, body.content)
+
+
+@router.post("/challenges/upload", summary="Cargar pruebas (YAML)")
+def upload_challenges(body: YamlUpload, username: str = Depends(require_admin)):
+    """Carga el juego de pruebas desde el contenido de un YAML (como data/challenges.yaml).
+    Los estados de las pruebas que siguen en el fichero se conservan."""
+    return run_loader(load_challenges, body.content)

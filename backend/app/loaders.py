@@ -1,8 +1,8 @@
 """
-Validación y carga en base de datos de los YAML de contenido (días y bienvenida).
+Validación y carga en base de datos de los YAML de contenido.
 
-Se usan desde el panel de administración: si el YAML tiene errores se lanza
-YamlError con la lista de problemas y no se carga nada.
+Se usan desde el panel de administración (días, bienvenida y pruebas): si el
+YAML tiene errores se lanza YamlError con la lista de problemas y no se carga nada.
 """
 import yaml
 from psycopg.types.json import Jsonb
@@ -201,3 +201,67 @@ def load_welcome(text):
             conn.execute("INSERT INTO welcome (key, value) VALUES (%s, %s)", (key, Jsonb(value)))
 
     return {"sections": len(data.get("sections") or [])}
+
+
+# --- Juego de pruebas -----------------------------------------------------------
+
+
+def validate_challenges(data):
+    if not isinstance(data, dict):
+        return ["el fichero está vacío o no tiene el formato esperado"]
+    errors = []
+    for field in ("title", "intro"):
+        if not is_text(data.get(field)):
+            errors.append(f"falta '{field}'")
+
+    challenges = data.get("challenges")
+    if not isinstance(challenges, list) or not challenges:
+        return errors + ["falta la lista 'challenges' con las pruebas"]
+    seen = set()
+    for i, challenge in enumerate(challenges, start=1):
+        where = f"prueba {i}"
+        if not isinstance(challenge, dict):
+            errors.append(f"{where}: formato no válido")
+            continue
+        challenge_id = challenge.get("id")
+        if isinstance(challenge_id, bool) or not isinstance(challenge_id, (int, str)) or not str(challenge_id).strip():
+            errors.append(f"{where}: falta 'id' (un número o un texto)")
+        elif "/" in str(challenge_id):
+            errors.append(f"{where}: 'id' no puede contener '/'")
+        elif str(challenge_id).strip() in seen:
+            errors.append(f"{where}: el id '{challenge_id}' está repetido")
+        else:
+            seen.add(str(challenge_id).strip())
+            where = f"prueba '{challenge_id}'"
+        if not is_text(challenge.get("description")):
+            errors.append(f"{where}: falta 'description'")
+    return errors
+
+
+def load_challenges(text):
+    """Deja las pruebas igual que el YAML. Los estados de las pruebas que siguen se conservan."""
+    data = parse_yaml(text)
+    errors = validate_challenges(data)
+    if errors:
+        raise YamlError(errors)
+    challenges = data["challenges"]
+    ids = [str(c["id"]).strip() for c in challenges]
+
+    with connect() as conn:
+        conn.execute("DELETE FROM challenges_page")
+        for key in ("title", "intro"):
+            conn.execute(
+                "INSERT INTO challenges_page (key, value) VALUES (%s, %s)", (key, data[key].strip())
+            )
+        for position, (challenge_id, challenge) in enumerate(zip(ids, challenges), start=1):
+            conn.execute(
+                """
+                INSERT INTO challenges (id, description, position) VALUES (%s, %s, %s)
+                ON CONFLICT (id) DO UPDATE
+                SET description = EXCLUDED.description, position = EXCLUDED.position
+                """,
+                (challenge_id, challenge["description"].strip(), position),
+            )
+        deleted = conn.execute("DELETE FROM challenges WHERE NOT (id = ANY(%s))", (ids,)).rowcount
+
+    return {"loaded": len(ids), "deleted": deleted}

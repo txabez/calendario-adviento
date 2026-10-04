@@ -1,13 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-
-// Convierte **texto** en negrita
-function RichText({ text }) {
-  return text
-    .trim()
-    .split(/\*\*(.+?)\*\*/g)
-    .map((part, i) => (i % 2 ? <strong key={i}>{part}</strong> : part))
-}
+import RichText from '../components/RichText.jsx'
 
 export default function Welcome() {
   const [page, setPage] = useState(null)

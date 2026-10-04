@@ -403,3 +403,91 @@ li::marker {
   justify-content: flex-end;
   gap: var(--space-sm);
 }
+
+/* Juego de pruebas */
+.challenge-grid {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(6.5rem, 1fr));
+  gap: var(--space-md);
+  margin-top: var(--space-lg);
+}
+
+.challenge-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+  min-height: 6.5rem;
+  padding: var(--space-md) var(--space-sm);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  color: var(--color-text);
+  text-decoration: none;
+  overflow-wrap: anywhere;
+  transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
+}
+
+.challenge-tile:hover,
+.challenge-tile:focus-visible {
+  border-color: var(--color-text);
+  box-shadow: var(--glow);
+  transform: scale(1.05);
+}
+
+.challenge-tile-id {
+  font-family: var(--font-title);
+  font-size: clamp(1.25rem, 5vw, 1.75rem);
+  line-height: 1.1;
+}
+
+.challenge-tile small {
+  color: var(--color-text-soft);
+}
+
+/* Color según el estado (los temas sin --color-success... usan el color de texto) */
+.challenge-tile.status-success { border-color: var(--color-success, var(--color-text)); }
+.challenge-tile.status-fail { border-color: var(--color-fail, var(--color-accent)); }
+.challenge-tile.status-ignore { border-color: var(--color-ignore, var(--color-border)); }
+
+.challenge-tile.status-success small,
+.challenge-status.status-success { color: var(--color-success, var(--color-text)); }
+.challenge-tile.status-fail small,
+.challenge-status.status-fail { color: var(--color-fail, var(--color-accent)); }
+.challenge-tile.status-ignore small,
+.challenge-status.status-ignore { color: var(--color-ignore, var(--color-text-soft)); }
+
+.challenge-status {
+  font-family: var(--font-title);
+  font-size: 1.1rem;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  margin-top: var(--space-md);
+}
+
+.challenge-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-md);
+}
+
+.challenge-actions .button.status-success { border-color: var(--color-success, var(--color-text)); color: var(--color-success, var(--color-text)); }
+.challenge-actions .button.status-fail { border-color: var(--color-fail, var(--color-accent)); color: var(--color-fail, var(--color-accent)); }
+.challenge-actions .button.status-ignore { border-color: var(--color-ignore, var(--color-text-soft)); color: var(--color-ignore, var(--color-text-soft)); }
+
+/* Botón del estado actual: relleno con su color */
+.challenge-actions .button.active,
+.challenge-actions .button:hover,
+.challenge-actions .button:focus-visible {
+  color: var(--color-bg);
+  box-shadow: var(--glow);
+}
+.challenge-actions .button.status-success.active,
+.challenge-actions .button.status-success:hover { background: var(--color-success, var(--color-text)); }
+.challenge-actions .button.status-fail.active,
+.challenge-actions .button.status-fail:hover { background: var(--color-fail, var(--color-accent)); }
+.challenge-actions .button.status-ignore.active,
+.challenge-actions .button.status-ignore:hover { background: var(--color-ignore, var(--color-text-soft)); }

@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.admin import router as admin_router
 from app.auth import sync_admin
+from app.challenges import router as challenges_router
 from app.db import MAX_ATTEMPTS, TOTAL_DAYS, connect, init_db
 from app.player import create_session, find_session, is_unlocked, mark_unlocked, player_token
 
@@ -34,6 +35,7 @@ app = FastAPI(
     openapi_url="/api/openapi.json",
     openapi_tags=[
         {"name": "Jugador", "description": "Lo que usa la app: bienvenida y días."},
+        {"name": "Pruebas", "description": "Juego de pruebas: explicación, pruebas y su estado."},
         {"name": "Administración", "description": "Panel de admin.html. Requiere token."},
         {"name": "Sistema", "description": "Estado del servicio."},
     ],
@@ -48,6 +50,7 @@ app.add_middleware(
 )
 
 app.include_router(admin_router)
+app.include_router(challenges_router)
 
 
 @app.get("/api/health", tags=["Sistema"], summary="Estado del backend y la base de datos")

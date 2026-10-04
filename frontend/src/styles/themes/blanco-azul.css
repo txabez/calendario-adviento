@@ -12,6 +12,11 @@
   --color-accent: #0b2f8a;
   --color-border: #1d4ed840;
 
+  /* Estados del juego de pruebas */
+  --color-success: #15803d;
+  --color-fail: #b91c1c;
+  --color-ignore: #64748b;
+
   /* Tipografías */
   --font-title: 'Josefin Sans', system-ui, sans-serif;
   --font-body: 'Josefin Sans', system-ui, sans-serif;

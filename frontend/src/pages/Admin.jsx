@@ -102,6 +102,8 @@ function Panel({ token, onLogout }) {
   const [upload, setUpload] = useState(null) // { ok, text, errors }
   const [players, setPlayers] = useState(null)
   const [closing, setClosing] = useState(null)
+  const [challenges, setChallenges] = useState(null)
+  const [resettingChallenges, setResettingChallenges] = useState(false)
 
   const api = useCallback(
     (path, { json, ...options } = {}) =>
@@ -154,6 +156,23 @@ function Panel({ token, onLogout }) {
       .finally(() => setClosing(null))
   }
 
+  const loadChallenges = useCallback(() => {
+    api('/challenges')
+      .then(setChallenges)
+      .catch((e) => setError(e.message))
+  }, [api])
+
+  useEffect(loadChallenges, [loadChallenges])
+
+  function resetChallenges() {
+    if (!window.confirm('¿Resetear todas las pruebas? Volverán a estar pendientes.')) return
+    setResettingChallenges(true)
+    api('/challenges/reset', { method: 'POST' })
+      .then(loadChallenges)
+      .catch((e) => setError(e.message))
+      .finally(() => setResettingChallenges(false))
+  }
+
   // action: 'reset' (devuelve todos los intentos) o 'block' (bloquea el día)
   function dayAction(id, action) {
     setBusyDay(id)
@@ -171,6 +190,7 @@ function Panel({ token, onLogout }) {
       .then((result) => {
         setUpload({ ok: true, text: `${file.name}: ${describe(result)}` })
         loadDays()
+        loadChallenges()
       })
       .catch((e) => setUpload({ ok: false, text: `${file.name}: ${e.message}`, errors: e.details }))
   }
@@ -201,6 +221,14 @@ function Panel({ token, onLogout }) {
           onFile={(file) =>
             uploadYaml('/welcome/upload', file, (r) =>
               `bienvenida cargada (${r.sections} secciones)`,
+            )
+          }
+        />
+        <YamlButton
+          label="Cargar pruebas"
+          onFile={(file) =>
+            uploadYaml('/challenges/upload', file, (r) =>
+              `cargadas ${r.loaded} pruebas` + (r.deleted ? `, borradas ${r.deleted}` : ''),
             )
           }
         />
@@ -258,6 +286,29 @@ function Panel({ token, onLogout }) {
           })}
         </ul>
       )}
+
+      <section className="text-block">
+        <h2>Juego de pruebas</h2>
+        {challenges && challenges.total === 0 && <p>No hay pruebas cargadas.</p>}
+        {challenges && challenges.total > 0 && (
+          <>
+            <p>
+              {challenges.total} pruebas: {challenges.success} superadas, {challenges.fail}{' '}
+              fallidas, {challenges.ignore} ignoradas y {challenges.pending} pendientes.
+            </p>
+            <div className="admin-actions">
+              <button
+                type="button"
+                className="button button-small"
+                onClick={resetChallenges}
+                disabled={resettingChallenges || challenges.pending === challenges.total}
+              >
+                Resetear pruebas
+              </button>
+            </div>
+          </>
+        )}
+      </section>
 
       <section className="text-block">
         <h2>Sesiones de jugador</h2>

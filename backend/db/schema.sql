@@ -72,3 +72,29 @@ CREATE TABLE IF NOT EXISTS unlocked_days (
     unlocked_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     PRIMARY KEY (session_id, day_id)
 );
+
+
+-- Juego de pruebas (se carga desde data/challenges.yaml con "Cargar pruebas" en admin.html)
+
+-- Textos de la página principal del juego, en filas clave-valor: title, intro
+CREATE TABLE IF NOT EXISTS challenges_page (
+    key   TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+);
+
+
+-- Pruebas, en el orden del YAML
+CREATE TABLE IF NOT EXISTS challenges (
+    id          TEXT PRIMARY KEY,
+    description TEXT NOT NULL,
+    position    INTEGER NOT NULL
+);
+
+
+-- Estado de cada prueba. No viene del YAML: lo marcan los jugadores y se conserva
+-- al recargarlo (solo se borra si la prueba desaparece del YAML).
+CREATE TABLE IF NOT EXISTS challenge_results (
+    challenge_id TEXT PRIMARY KEY REFERENCES challenges (id) ON DELETE CASCADE,
+    status       TEXT NOT NULL CHECK (status IN ('success', 'fail', 'ignore')),
+    updated_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+);

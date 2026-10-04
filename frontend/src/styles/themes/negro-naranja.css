@@ -16,6 +16,11 @@
   --color-accent: #ff5e00;    /* errores, días bloqueados, destacados */
   --color-border: #ff8c1a55;  /* bordes y separadores */
 
+  /* Estados del juego de pruebas */
+  --color-success: #8fd16a;   /* prueba superada */
+  --color-fail: #ff4d4d;      /* prueba fallida */
+  --color-ignore: #a39486;    /* prueba ignorada */
+
   /* Tipografías */
   --font-title: 'Josefin Sans', system-ui, sans-serif;
   --font-body: 'Josefin Sans', system-ui, sans-serif;

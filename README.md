@@ -13,6 +13,7 @@ Calendario de adviento web y personalizable: una página de bienvenida, un calen
   - cargar los YAML de días y de bienvenida;
   - resetear o bloquear un día;
   - ver y cancelar sesiones de jugador.
+- **Juego de pruebas** (`/pruebas`), independiente del calendario: una página de explicación, un botón por prueba (tantas como tenga el YAML) y en cada prueba los botones **Superada**, **Fallida** e **Ignorar**. El estado se guarda en la base de datos.
 - **API documentada con OpenAPI** (Swagger UI) para ver y probar los endpoints.
 - Diseño oscuro (fondo negro, texto naranja) y adaptado a móvil, con todo el estilo en un único fichero.
 
@@ -70,12 +71,13 @@ Requisitos: Docker con Docker Compose.
    docker compose up -d --build
    ```
 
-5. Entra en http://localhost:5173/admin.html con el usuario de `admin.yaml` y carga `days.yaml` y `welcome.yaml` con los botones **Cargar días** y **Cargar bienvenida**.
+5. Entra en http://localhost:5173/admin.html con el usuario de `admin.yaml` y carga `days.yaml`, `welcome.yaml` y `challenges.yaml` con los botones **Cargar días**, **Cargar bienvenida** y **Cargar pruebas**.
 
 | Servicio | URL local | Dentro de la red `adviento` |
 |---|---|---|
 | App | http://localhost:5173 | `frontend:5173` |
 | Panel de administración | http://localhost:5173/admin.html | |
+| Juego de pruebas | http://localhost:5173/pruebas | |
 | API | http://localhost:8000 | `backend:8000` |
 | Documentación de la API | http://localhost:8000/api/docs | |
 | PostgreSQL | `localhost:5432` | `db:5432` |
@@ -157,6 +159,25 @@ sections:
 ```
 
 Si un YAML tiene errores, el panel indica cuáles y dónde, y no carga nada.
+
+### `challenges.yaml`: juego de pruebas
+
+Se carga desde el panel con **Cargar pruebas**.
+
+```yaml
+title: Juego de pruebas
+intro: >
+  Explicación del juego. Admite **negrita**.
+
+challenges:                     # tantas pruebas como quieras, en este orden
+  - id: 1                       # número o texto corto (sin "/"); se muestra en el botón
+    description: |
+      Cantar un villancico completo.
+  - id: bonus
+    description: Construir un muñeco de nieve.
+```
+
+El estado de cada prueba se conserva al recargar el YAML. Solo se borra el de las pruebas que se quitan del fichero.
 
 ## Personalización
 
