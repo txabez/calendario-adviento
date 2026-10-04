@@ -1,7 +1,8 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { defineConfig } from 'vite'
+import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
+import tailwindcss from '@tailwindcss/vite'
 
 // Tema visual: se elige al arrancar con la variable de entorno THEME
 // (ver docker/docker-compose.yaml). Es un fichero de src/styles/themes/.
@@ -17,30 +18,27 @@ if (!/^[a-z0-9-]+$/.test(theme) || !existsSync(themeFile)) {
 }
 console.log(`Tema: ${theme}`)
 
-// Favicon con los colores del tema: fondo --color-bg y líneas --color-text
-function themeColor(name) {
-  const css = readFileSync(themeFile, 'utf-8')
-  const match = css.match(new RegExp(`--${name}:\\s*([^;]+);`))
+// Favicon con los colores del tema: fondo --background y líneas --primary
+function themeColor(name: string) {
+  const match = readFileSync(themeFile, 'utf-8').match(new RegExp(`--${name}:\\s*([^;]+);`))
   if (!match) throw new Error(`El tema "${theme}" no define --${name}`)
   return match[1].trim()
 }
 
-function themeFavicon() {
+function themeFavicon(): Plugin {
   const svg = () =>
     readFileSync(resolve(__dirname, 'src/assets/favicon.svg'), 'utf-8')
-      .replaceAll('__BG__', themeColor('color-bg'))
-      .replaceAll('__FG__', themeColor('color-text'))
+      .replaceAll('__BG__', themeColor('background'))
+      .replaceAll('__FG__', themeColor('primary'))
 
   return {
     name: 'theme-favicon',
-    // Desarrollo: sirve /favicon.svg generado
     configureServer(server) {
-      server.middlewares.use('/favicon.svg', (req, res) => {
+      server.middlewares.use('/favicon.svg', (_req, res) => {
         res.setHeader('Content-Type', 'image/svg+xml')
         res.end(svg())
       })
     },
-    // Producción: lo añade a la compilación
     generateBundle() {
       this.emitFile({ type: 'asset', fileName: 'favicon.svg', source: svg() })
     },
@@ -48,10 +46,11 @@ function themeFavicon() {
 }
 
 export default defineConfig({
-  plugins: [react(), themeFavicon()],
+  plugins: [react(), tailwindcss(), themeFavicon()],
   resolve: {
     alias: {
       '@theme': themeFile,
+      '@': resolve(__dirname, 'src'),
     },
   },
   server: {

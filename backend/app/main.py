@@ -110,6 +110,28 @@ def day_content(day):
     }
 
 
+@app.get("/api/days", tags=["Jugador"], summary="Estado de todos los días")
+def days_status(token: str = Depends(player_token)):
+    """Para cada día: si esta sesión de jugador ya lo abrió (unlocked) y si está bloqueado.
+    No revela el contenido."""
+    with connect() as conn:
+        session_id = find_session(conn, token)
+        days = conn.execute(
+            """
+            SELECT d.id, d.attempts_left <= 0 AS blocked, u.day_id IS NOT NULL AS opened
+            FROM days d
+            LEFT JOIN unlocked_days u ON u.day_id = d.id AND u.session_id = %s
+            ORDER BY d.id
+            """,
+            (session_id,),
+        ).fetchall()
+    # Un día bloqueado no cuenta como abierto (igual que en GET /api/days/{day_id})
+    return [
+        {"id": d["id"], "blocked": d["blocked"], "unlocked": d["opened"] and not d["blocked"]}
+        for d in days
+    ]
+
+
 @app.get("/api/days/{day_id}", tags=["Jugador"], summary="Estado de un día")
 def day_status(day_id: int, token: str = Depends(player_token)):
     """Estado del día. Si esta sesión de jugador ya lo abrió, incluye su contenido."""

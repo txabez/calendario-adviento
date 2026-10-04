@@ -1,28 +1,33 @@
 /*
  * Tema "blanco-azul": fondo blanco y letras azules.
  */
-@import url('https://fonts.googleapis.com/css2?family=Josefin+Sans:wght@300;400;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Josefin+Sans:wght@300;400;600&family=Inter:wght@400;500;600&display=swap');
 
 :root {
-  /* Colores */
-  --color-bg: #ffffff;
-  --color-surface: #f1f5fc;
-  --color-text: #1d4ed8;
-  --color-text-soft: #3a5ba0;
-  --color-accent: #0b2f8a;
-  --color-border: #1d4ed840;
+  --background: #ffffff;
+  --foreground: #1d4ed8;
+  --card: #f1f5fc;
+  --card-foreground: #1d4ed8;
+  --popover: #ffffff;
+  --popover-foreground: #1d4ed8;
+  --primary: #1d4ed8;
+  --primary-foreground: #ffffff;
+  --secondary: #e0e9fb;
+  --secondary-foreground: #1e40af;
+  --muted: #eef3fc;
+  --muted-foreground: #3a5ba0;
+  --accent: #e0e9fb;
+  --accent-foreground: #1d4ed8;
+  --destructive: #b91c1c;
+  --success: #15803d;
+  --border: #1d4ed830;
+  --input: #1d4ed840;
+  --ring: #1d4ed8;
+  --radius: 0.9rem;
 
-  /* Estados del juego de pruebas */
-  --color-success: #15803d;
-  --color-fail: #b91c1c;
-  --color-ignore: #64748b;
-
-  /* Tipografías */
   --font-title: 'Josefin Sans', system-ui, sans-serif;
-  --font-body: 'Josefin Sans', system-ui, sans-serif;
-
-  /* Efectos */
-  --glow: 0 0 10px #1d4ed833;
+  --font-body: 'Inter', system-ui, sans-serif;
+  --glow: 0 0 16px #1d4ed833;
 
   color-scheme: light;
 }

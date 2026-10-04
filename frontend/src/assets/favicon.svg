@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <!-- Plantilla: vite.config.js pone el fondo con color-bg y las líneas con color-text del tema -->
+  <!-- Plantilla: vite.config.js pone el fondo con background y las líneas con primary del tema -->
   <!-- Fondo -->
   <rect width="64" height="64" rx="12" fill="__BG__"/>
   <g fill="none" stroke="__FG__" stroke-width="3.5" stroke-linecap="round">

@@ -1,32 +1,37 @@
 /*
  * Tema "negro-naranja": fondo negro y letras naranjas.
  *
- * Cada tema solo define colores, tipografías y efectos. Para crear uno nuevo,
- * copia este fichero con otro nombre (solo minúsculas, números y guiones) y
- * cambia los valores.
+ * Cada tema define las variables de color que usan los componentes de shadcn/ui
+ * (--background, --primary, --card...) y las tipografías. Para crear uno nuevo,
+ * copia este fichero con otro nombre (minúsculas, números y guiones) y cambia los valores.
  */
-@import url('https://fonts.googleapis.com/css2?family=Josefin+Sans:wght@300;400;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Josefin+Sans:wght@300;400;600&family=Inter:wght@400;500;600&display=swap');
 
 :root {
-  /* Colores */
-  --color-bg: #000000;        /* fondo */
-  --color-surface: #140a05;   /* fondo de casillas y campos */
-  --color-text: #ff8c1a;      /* texto principal y títulos */
-  --color-text-soft: #ffb366; /* párrafos y textos secundarios */
-  --color-accent: #ff5e00;    /* errores, días bloqueados, destacados */
-  --color-border: #ff8c1a55;  /* bordes y separadores */
+  --background: #000000;            /* fondo de la página */
+  --foreground: #ff8c1a;            /* texto principal */
+  --card: #140a05;                  /* fondo de tarjetas y casillas */
+  --card-foreground: #ff8c1a;
+  --popover: #140a05;
+  --popover-foreground: #ff8c1a;
+  --primary: #ff8c1a;               /* botones, días abiertos, destacados */
+  --primary-foreground: #000000;    /* texto sobre --primary */
+  --secondary: #2a1608;
+  --secondary-foreground: #ffb366;
+  --muted: #1f1108;
+  --muted-foreground: #ffb366;      /* textos secundarios */
+  --accent: #2a1608;                /* fondo al pasar el ratón */
+  --accent-foreground: #ff8c1a;
+  --destructive: #ff4d4d;           /* errores, días bloqueados, pruebas fallidas */
+  --success: #8fd16a;               /* pruebas superadas */
+  --border: #ff8c1a40;
+  --input: #ff8c1a55;
+  --ring: #ff8c1a;                  /* contorno al enfocar */
+  --radius: 0.9rem;
 
-  /* Estados del juego de pruebas */
-  --color-success: #8fd16a;   /* prueba superada */
-  --color-fail: #ff4d4d;      /* prueba fallida */
-  --color-ignore: #a39486;    /* prueba ignorada */
-
-  /* Tipografías */
   --font-title: 'Josefin Sans', system-ui, sans-serif;
-  --font-body: 'Josefin Sans', system-ui, sans-serif;
-
-  /* Efectos */
-  --glow: 0 0 12px #ff8c1a66; /* brillo de títulos y botones */
+  --font-body: 'Inter', system-ui, sans-serif;
+  --glow: 0 0 18px #ff8c1a66;       /* brillo */
 
   color-scheme: dark;
 }

@@ -1,10 +1,10 @@
 import { BrowserRouter, Route, Routes } from 'react-router-dom'
-import Welcome from './pages/Welcome.jsx'
-import Calendar from './pages/Calendar.jsx'
-import Day from './pages/Day.jsx'
-import ChallengesIntro from './pages/challenges/ChallengesIntro.jsx'
-import ChallengesList from './pages/challenges/ChallengesList.jsx'
-import Challenge from './pages/challenges/Challenge.jsx'
+import Welcome from '@/pages/Welcome'
+import Calendar from '@/pages/Calendar'
+import Day from '@/pages/Day'
+import ChallengesIntro from '@/pages/challenges/ChallengesIntro'
+import ChallengesList from '@/pages/challenges/ChallengesList'
+import Challenge from '@/pages/challenges/Challenge'
 
 export default function App() {
   return (

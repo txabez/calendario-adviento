@@ -1,9 +1,10 @@
+# Frontend: React + TypeScript + Tailwind v4 + shadcn/ui, servido por Vite
 FROM node:22-alpine
 
 WORKDIR /app
 
 COPY package*.json ./
-RUN npm install
+RUN npm ci
 
 COPY . .
 

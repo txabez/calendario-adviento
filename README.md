@@ -15,13 +15,13 @@ Calendario de adviento web y personalizable: una página de bienvenida, un calen
   - ver y cancelar sesiones de jugador.
 - **Juego de pruebas** (`/pruebas`), independiente del calendario: una página de explicación, un botón por prueba (tantas como tenga el YAML) y en cada prueba los botones **Superada**, **Fallida** e **Ignorar**. El estado se guarda en la base de datos.
 - **API documentada con OpenAPI** (Swagger UI) para ver y probar los endpoints.
-- Diseño oscuro (fondo negro, texto naranja) y adaptado a móvil, con todo el estilo en un único fichero.
+- Interfaz moderna y animada (componentes de shadcn/ui y animaciones con Motion), adaptada a móvil y con temas de color que se eligen al arrancar.
 
 ## Stack
 
 | Parte | Tecnología |
 |---|---|
-| Frontend | React 19 + Vite + React Router |
+| Frontend | React 19 + TypeScript + Vite + React Router, Tailwind CSS v4 + shadcn/ui, Motion, iconos Lucide |
 | Backend | FastAPI (Python 3.12) + psycopg 3 |
 | Base de datos | PostgreSQL 17 |
 | Entorno | Docker Compose (red `adviento`) |
@@ -46,14 +46,17 @@ Calendario de adviento web y personalizable: una página de bienvenida, un calen
 │   ├── data/                    # YAML de contenido (no se sube al repo)
 │   └── requirements.txt
 └── frontend/
-    ├── index.html               # app: bienvenida, calendario y días
+    ├── index.html               # app: bienvenida, calendario, días y juego de pruebas
     ├── admin.html               # panel de administración
+    ├── components.json          # configuración de shadcn/ui
     ├── public/images/           # imágenes de los tipos de día (no se suben al repo)
     └── src/
-        ├── pages/               # Welcome, Calendar, Day, Admin
-        ├── components/          # componentes reutilizables
+        ├── pages/               # Welcome, Calendar, Day, Admin y challenges/
+        ├── components/          # componentes propios (Page, RichText, PasswordInput…)
+        │   └── ui/              # componentes de shadcn/ui
+        ├── lib/                 # clientes de la API (api.ts, admin-api.ts) y utilidades
         └── styles/
-            ├── base.css         # estructura común a todos los temas
+            ├── index.css        # Tailwind y conexión de las variables del tema
             └── themes/          # un fichero por tema (colores y tipografías)
 ```
 
@@ -155,6 +158,7 @@ sections:
       - text: Un párrafo.
       - list:
           - "**En negrita:** los asteriscos dobles marcan negrita"
+          - "Un enlace: [texto que se ve](https://ejemplo.com)"
           - Otro elemento de la lista
 ```
 
@@ -187,8 +191,17 @@ El estado de cada prueba se conserva al recargar el YAML. Solo se borra el de la
   THEME=blanco-azul docker compose up -d frontend
   ```
 
-  También se puede fijar en `docker/.env` (`THEME=blanco-azul`). La web no permite cambiarlo. Para crear un tema, copia un fichero de `frontend/src/styles/themes/` con otro nombre (solo minúsculas, números y guiones) y cambia sus colores y tipografías. Si el tema no existe, el frontend no arranca y los logs muestran los temas disponibles. El favicon se genera con los colores del tema (`--color-bg` de fondo y `--color-text` en las líneas) a partir de la plantilla `frontend/src/assets/favicon.svg`.
+  También se puede fijar en `docker/.env` (`THEME=blanco-azul`). La web no permite cambiarlo. Para crear un tema, copia un fichero de `frontend/src/styles/themes/` con otro nombre (solo minúsculas, números y guiones) y cambia sus colores y tipografías. Si el tema no existe, el frontend no arranca y los logs muestran los temas disponibles. Cada tema define las variables de color de shadcn/ui (`--background`, `--foreground`, `--primary`, `--card`, `--muted-foreground`, `--destructive`, `--success`…), las tipografías (`--font-title`, `--font-body`) y el brillo (`--glow`). El favicon se genera con los colores del tema (`--background` de fondo y `--primary` en las líneas) a partir de la plantilla `frontend/src/assets/favicon.svg`.
 - **Tipos de día e imágenes:** se definen en la sección `types` de `days.yaml`, y las imágenes van en `frontend/public/images/`.
+- **Componentes de shadcn/ui:** se añaden con su herramienta, desde un contenedor de Node (no hace falta Node en el ordenador):
+
+  ```bash
+  cd frontend
+  docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp -v "$PWD":/app -w /app node:22-alpine \
+    npx shadcn@latest add <componente> --yes --overwrite
+  ```
+
+  Revisa después los ficheros de `src/components/ui/`: la herramienta a veces escribe `import { cn } from "cn"` e instala un paquete `cn` que no es el nuestro. Hay que cambiarlo por `@/lib/utils` y desinstalar el paquete (`npm uninstall cn`).
 - **Esquema de la base de datos:** está en `backend/db/schema.sql` y se aplica en cada arranque del backend. Usa `CREATE TABLE IF NOT EXISTS`, así que solo crea lo que falta: para modificar tablas que ya existen, añade el `ALTER TABLE` correspondiente.
 - **Número de días e intentos:** 24 días y 10 intentos. Estos valores están tanto en `schema.sql` como en `backend/app/db.py` (`TOTAL_DAYS` y `MAX_ATTEMPTS`), y deben coincidir.
 

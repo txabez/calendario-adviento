@@ -1,2 +1,5 @@
 backend/data/
 frontend/public/images/
+qr/
+node_modules/
+dist/
