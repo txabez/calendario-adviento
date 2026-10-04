@@ -7,13 +7,13 @@ Calendario de adviento web y personalizable: una página de bienvenida, un calen
 - **Bienvenida** con título, introducción y secciones (instrucciones, normas…) editables desde YAML.
 - **Calendario de 24 días**: cada día se abre con su contraseña.
 - **Tipos de día configurables** (nombre e imagen), definidos en el YAML de días.
-- **10 intentos por día**: al agotarlos, el día queda bloqueado. El contador aparece a partir del primer fallo.
-- **Sesión de jugador**: los días ya abiertos no vuelven a pedir la contraseña en ese navegador.
+- **10 intentos por día y sesión**: al agotarlos, el día queda bloqueado para esa sesión. El contador aparece a partir del primer fallo.
+- **Condiciones y sesión de jugador**: al entrar se muestra un diálogo para aceptar participar y mantener la confidencialidad. Al aceptar se crea la sesión de jugador de ese navegador, con la que los días ya abiertos no vuelven a pedir la contraseña. Si se rechaza, se muestra una página indicando que no se puede continuar. Arriba a la derecha de cada página hay un avatar con un menú para **cerrar la sesión**: el navegador tendrá que volver a aceptar las condiciones, y la sesión queda en el panel como cerrada, con su historial.
 - **Panel de administración** (`admin.html`):
-  - cargar los YAML de días y de bienvenida;
-  - resetear o bloquear un día;
-  - ver y cancelar sesiones de jugador.
-- **Juego de pruebas** (`/pruebas`), independiente del calendario: una página de explicación, un botón por prueba (tantas como tenga el YAML) y en cada prueba los botones **Superada**, **Fallida** e **Ignorar**. El estado se guarda en la base de datos.
+  - cargar los YAML de días, bienvenida, condiciones y pruebas;
+  - ver las sesiones de jugador y, en cada una, resetear o bloquear sus días y resetear sus pruebas;
+  - cancelar una sesión (borra todo su estado).
+- **Juego de pruebas** (`/pruebas`), independiente del calendario: una página de explicación, un botón por prueba (tantas como tenga el YAML) y en cada prueba los botones **Superada**, **Fallida** e **Ignorar**. El estado se guarda en la base de datos, por sesión de jugador.
 - **API documentada con OpenAPI** (Swagger UI) para ver y probar los endpoints.
 - Interfaz moderna y animada (componentes de shadcn/ui y animaciones con Motion), adaptada a móvil y con temas de color que se eligen al arrancar.
 
@@ -74,7 +74,7 @@ Requisitos: Docker con Docker Compose.
    docker compose up -d --build
    ```
 
-5. Entra en http://localhost:5173/admin.html con el usuario de `admin.yaml` y carga `days.yaml`, `welcome.yaml` y `challenges.yaml` con los botones **Cargar días**, **Cargar bienvenida** y **Cargar pruebas**.
+5. Entra en http://localhost:5173/admin.html con el usuario de `admin.yaml` y carga `days.yaml`, `welcome.yaml`, `challenges.yaml` y `consent.yaml` con los botones **Cargar días**, **Cargar bienvenida**, **Cargar pruebas** y **Cargar condiciones**.
 
 | Servicio | URL local | Dentro de la red `adviento` |
 |---|---|---|
@@ -140,7 +140,7 @@ days:
       Hoy toca decorar galletas de jengibre juntos.
 ```
 
-Al cargar el YAML, las tablas quedan exactamente como el fichero: los días que no aparecen se borran. Los intentos restantes de cada día se conservan.
+Al cargar el YAML, las tablas quedan exactamente como el fichero: los días que no aparecen se borran. Los intentos y los días abiertos de cada sesión se conservan.
 
 ### `welcome.yaml`: página de bienvenida
 
@@ -181,7 +181,26 @@ challenges:                     # tantas pruebas como quieras, en este orden
     description: Construir un muñeco de nieve.
 ```
 
-El estado de cada prueba se conserva al recargar el YAML. Solo se borra el de las pruebas que se quitan del fichero.
+El estado de cada prueba en cada sesión se conserva al recargar el YAML. Solo se borra el de las pruebas que se quitan del fichero.
+
+### `consent.yaml`: condiciones de entrada
+
+Se carga desde el panel con **Cargar condiciones**. Cada condición es una casilla que hay que marcar para poder entrar.
+
+```yaml
+title: Antes de empezar
+intro: Para entrar tienes que aceptar estas condiciones.   # opcional
+
+conditions:                     # tantas como quieras
+  - Acepto y consiento participar en el calendario de adviento.
+  - Prometo mantener la confidencialidad de todo su contenido.
+
+rejected:                       # página al rechazar (opcional)
+  title: No puedes continuar
+  text: Para participar es necesario aceptar las condiciones.
+```
+
+Si cambias las condiciones, quienes ya las aceptaron no tienen que volver a hacerlo.
 
 ## Personalización
 
@@ -203,7 +222,7 @@ El estado de cada prueba se conserva al recargar el YAML. Solo se borra el de la
 
   Revisa después los ficheros de `src/components/ui/`: la herramienta a veces escribe `import { cn } from "cn"` e instala un paquete `cn` que no es el nuestro. Hay que cambiarlo por `@/lib/utils` y desinstalar el paquete (`npm uninstall cn`).
 - **Esquema de la base de datos:** está en `backend/db/schema.sql` y se aplica en cada arranque del backend. Usa `CREATE TABLE IF NOT EXISTS`, así que solo crea lo que falta: para modificar tablas que ya existen, añade el `ALTER TABLE` correspondiente.
-- **Número de días e intentos:** 24 días y 10 intentos. Estos valores están tanto en `schema.sql` como en `backend/app/db.py` (`TOTAL_DAYS` y `MAX_ATTEMPTS`), y deben coincidir.
+- **Número de días e intentos:** 24 días y 10 intentos por día y sesión. Estos valores están tanto en `schema.sql` como en `backend/app/db.py` (`TOTAL_DAYS` y `MAX_ATTEMPTS`), y deben coincidir.
 
 ## API
 

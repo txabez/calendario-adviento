@@ -9,7 +9,8 @@ from app.admin import router as admin_router
 from app.auth import sync_admin
 from app.challenges import router as challenges_router
 from app.db import MAX_ATTEMPTS, TOTAL_DAYS, connect, init_db
-from app.player import create_session, find_session, is_unlocked, mark_unlocked, player_token
+from app.player import day_state, fail_attempt, find_session, mark_unlocked, player_token
+from app.player import router as player_router
 
 
 @asynccontextmanager
@@ -25,8 +26,8 @@ app = FastAPI(
         "API del calendario de adviento.\n\n"
         "Para probar los endpoints de **Administración**: llama a `POST /api/admin/login`, "
         "copia el `token` y pégalo en **Authorize → Administrador**.\n\n"
-        "Para simular a un jugador que ya abrió días, pega su `player_token` "
-        "en **Authorize → Jugador**."
+        "Para probar como jugador: llama a `POST /api/player/session` (aceptar las "
+        "condiciones), copia el `player_token` y pégalo en **Authorize → Jugador**."
     ),
     lifespan=lifespan,
     # Bajo /api para que también se vean a través del proxy del frontend (puerto 5173)
@@ -50,6 +51,7 @@ app.add_middleware(
 )
 
 app.include_router(admin_router)
+app.include_router(player_router)
 app.include_router(challenges_router)
 
 
@@ -94,7 +96,7 @@ def blocked():
 
 
 DAY_QUERY = """
-    SELECT d.id, d.password, d.message, d.attempts_left,
+    SELECT d.id, d.password, d.message,
            d.type, t.label AS type_label, t.image AS type_image
     FROM days d LEFT JOIN day_types t ON t.key = d.type
     WHERE d.id = %s
@@ -112,18 +114,19 @@ def day_content(day):
 
 @app.get("/api/days", tags=["Jugador"], summary="Estado de todos los días")
 def days_status(token: str = Depends(player_token)):
-    """Para cada día: si esta sesión de jugador ya lo abrió (unlocked) y si está bloqueado.
-    No revela el contenido."""
+    """Para cada día, en esta sesión de jugador: si ya lo abrió (unlocked) y si está
+    bloqueado. No revela el contenido."""
     with connect() as conn:
         session_id = find_session(conn, token)
         days = conn.execute(
             """
-            SELECT d.id, d.attempts_left <= 0 AS blocked, u.day_id IS NOT NULL AS opened
+            SELECT d.id, COALESCE(s.attempts_left, %s) <= 0 AS blocked,
+                   s.unlocked_at IS NOT NULL AS opened
             FROM days d
-            LEFT JOIN unlocked_days u ON u.day_id = d.id AND u.session_id = %s
+            LEFT JOIN session_days s ON s.day_id = d.id AND s.session_id = %s
             ORDER BY d.id
             """,
-            (session_id,),
+            (MAX_ATTEMPTS, session_id),
         ).fetchall()
     # Un día bloqueado no cuenta como abierto (igual que en GET /api/days/{day_id})
     return [
@@ -134,58 +137,51 @@ def days_status(token: str = Depends(player_token)):
 
 @app.get("/api/days/{day_id}", tags=["Jugador"], summary="Estado de un día")
 def day_status(day_id: int, token: str = Depends(player_token)):
-    """Estado del día. Si esta sesión de jugador ya lo abrió, incluye su contenido."""
+    """Estado del día en esta sesión de jugador (intentos, bloqueado, abierto).
+    Si ya lo abrió, incluye su contenido."""
     check_day_id(day_id)
     with connect() as conn:
         day = conn.execute(DAY_QUERY, (day_id,)).fetchone()
         if day is None:
             raise HTTPException(status_code=404, detail="Día sin contenido")
-        blocked = day["attempts_left"] <= 0
-        # Un día bloqueado no se muestra aunque esta sesión ya lo hubiera abierto
-        unlocked = not blocked and is_unlocked(conn, find_session(conn, token), day_id)
+        state = day_state(conn, find_session(conn, token), day_id)
     return {
         "id": day_id,
-        "attempts_left": day["attempts_left"],
+        **state,
         "max_attempts": MAX_ATTEMPTS,
-        "blocked": blocked,
-        "unlocked": unlocked,
-        "content": day_content(day) if unlocked else None,
+        "content": day_content(day) if state["unlocked"] else None,
     }
 
 
 @app.post("/api/days/{day_id}/unlock", tags=["Jugador"], summary="Abrir un día con su contraseña")
 def unlock_day(day_id: int, body: Unlock, token: str = Depends(player_token)):
-    """Devuelve el contenido del día si la contraseña es correcta y lo deja desbloqueado
-    para la sesión de jugador (que se crea si no existe; su token va en la respuesta).
+    """Devuelve el contenido del día si la contraseña es correcta y lo deja abierto
+    para la sesión de jugador.
 
-    Cada contraseña incorrecta resta un intento; sin intentos el día queda bloqueado.
+    Exige una sesión de jugador (se crea al aceptar las condiciones en
+    POST /api/player/session); sin ella responde 403 y no gasta intentos.
+    Los intentos son de cada sesión: cada fallo resta uno y sin intentos el día
+    queda bloqueado para esa sesión.
     """
     check_day_id(day_id)
     with connect() as conn:
+        session_id = find_session(conn, token)
+        if session_id is None:
+            raise HTTPException(status_code=403, detail="Hay que aceptar las condiciones")
         day = conn.execute(DAY_QUERY, (day_id,)).fetchone()
         if day is None:
             raise HTTPException(status_code=404, detail="Día sin contenido")
-        if day["attempts_left"] <= 0:
+        if day_state(conn, session_id, day_id)["blocked"]:
             raise blocked()
         if body.password.strip() != day["password"]:
-            row = conn.execute(
-                """
-                UPDATE days SET attempts_left = attempts_left - 1
-                WHERE id = %s AND attempts_left > 0
-                RETURNING attempts_left
-                """,
-                (day_id,),
-            ).fetchone()
+            attempts_left = fail_attempt(conn, session_id, day_id)
             conn.commit()
-            if row is None or row["attempts_left"] <= 0:
+            if attempts_left <= 0:
                 raise blocked()
             raise HTTPException(
                 status_code=401,
-                detail={"message": "Contraseña incorrecta", "attempts_left": row["attempts_left"]},
+                detail={"message": "Contraseña incorrecta", "attempts_left": attempts_left},
             )
 
-        session_id = find_session(conn, token)
-        if session_id is None:
-            session_id, token = create_session(conn)
         mark_unlocked(conn, session_id, day_id)
-    return {**day_content(day), "player_token": token}
+    return day_content(day)

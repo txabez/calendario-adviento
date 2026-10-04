@@ -6,7 +6,14 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Confetti } from '@/components/Confetti'
-import { fetchChallenge, setChallengeStatus, type Challenge as ChallengeData, type ChallengeStatus } from '@/lib/api'
+import {
+  NoSessionError,
+  fetchChallenge,
+  setChallengeStatus,
+  type Challenge as ChallengeData,
+  type ChallengeStatus,
+} from '@/lib/api'
+import { useConsent } from '@/lib/consent'
 import { cn } from '@/lib/utils'
 import { STATUSES, statusInfo } from './status'
 
@@ -17,6 +24,7 @@ export default function Challenge() {
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [burst, setBurst] = useState(0)
+  const { requireConsent } = useConsent()
 
   useEffect(() => {
     setChallenge(null)
@@ -33,7 +41,8 @@ export default function Challenge() {
       setChallenge((c) => (c ? { ...c, status } : c))
       if (status === 'success') setBurst((b) => b + 1)
     } catch (e) {
-      setError((e as Error).message)
+      if (e instanceof NoSessionError) requireConsent()
+      else setError((e as Error).message)
     } finally {
       setSaving(false)
     }

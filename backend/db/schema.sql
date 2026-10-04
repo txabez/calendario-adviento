@@ -7,7 +7,7 @@
 --   docker compose restart backend
 --
 -- Ojo: estos valores también aparecen en backend/app/db.py y deben coincidir:
---   24 días (TOTAL_DAYS) y 10 intentos (MAX_ATTEMPTS).
+--   24 días (TOTAL_DAYS) y 10 intentos por día y sesión (MAX_ATTEMPTS).
 
 
 -- Tipos de día (se cargan desde la sección "types" de data/days.yaml)
@@ -23,9 +23,7 @@ CREATE TABLE IF NOT EXISTS days (
     id            INTEGER PRIMARY KEY CHECK (id BETWEEN 1 AND 24),
     password      TEXT NOT NULL,
     type          TEXT NOT NULL,   -- clave de day_types
-    message       TEXT NOT NULL,
-    -- Intentos de contraseña restantes: no viene del YAML, empieza en 10 y baja con cada fallo
-    attempts_left INTEGER NOT NULL DEFAULT 10
+    message       TEXT NOT NULL
 );
 
 
@@ -54,22 +52,28 @@ CREATE TABLE IF NOT EXISTS admin_sessions (
 );
 
 
--- Sesiones de jugador: se crean al abrir el primer día con la contraseña correcta.
+-- Sesiones de jugador: se crean al aceptar las condiciones (participar y mantener
+-- la confidencialidad). created_at es el momento de la aceptación.
 -- El navegador guarda el token y lo envía en la cabecera X-Player-Token.
 -- El administrador puede cancelarlas desde admin.html.
 CREATE TABLE IF NOT EXISTS player_sessions (
     id           SERIAL PRIMARY KEY,
     token        TEXT NOT NULL UNIQUE,
     created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
-    last_seen_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    last_seen_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    -- Cuándo la cerró el jugador (logout). Una sesión cerrada ya no vale, pero se
+    -- conserva con su estado para el panel de administración.
+    closed_at    TIMESTAMPTZ
 );
 
 
--- Días desbloqueados por cada sesión de jugador (ya no piden la contraseña)
-CREATE TABLE IF NOT EXISTS unlocked_days (
-    session_id  INTEGER NOT NULL REFERENCES player_sessions (id) ON DELETE CASCADE,
-    day_id      INTEGER NOT NULL REFERENCES days (id) ON DELETE CASCADE,
-    unlocked_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+-- Estado de cada día en cada sesión de jugador. La fila se crea al primer intento:
+-- sin fila, el día tiene todos sus intentos y está cerrado.
+CREATE TABLE IF NOT EXISTS session_days (
+    session_id    INTEGER NOT NULL REFERENCES player_sessions (id) ON DELETE CASCADE,
+    day_id        INTEGER NOT NULL REFERENCES days (id) ON DELETE CASCADE,
+    attempts_left INTEGER NOT NULL DEFAULT 10,  -- baja con cada fallo; en 0 está bloqueado
+    unlocked_at   TIMESTAMPTZ,                  -- cuándo se abrió con la contraseña (NULL: cerrado)
     PRIMARY KEY (session_id, day_id)
 );
 
@@ -91,10 +95,30 @@ CREATE TABLE IF NOT EXISTS challenges (
 );
 
 
--- Estado de cada prueba. No viene del YAML: lo marcan los jugadores y se conserva
--- al recargarlo (solo se borra si la prueba desaparece del YAML).
+-- Estado de cada prueba en cada sesión de jugador. No viene del YAML: lo marcan los
+-- jugadores y se conserva al recargarlo (solo se borra si la prueba desaparece del YAML).
 CREATE TABLE IF NOT EXISTS challenge_results (
-    challenge_id TEXT PRIMARY KEY REFERENCES challenges (id) ON DELETE CASCADE,
+    session_id   INTEGER NOT NULL REFERENCES player_sessions (id) ON DELETE CASCADE,
+    challenge_id TEXT NOT NULL REFERENCES challenges (id) ON DELETE CASCADE,
     status       TEXT NOT NULL CHECK (status IN ('success', 'fail', 'ignore')),
-    updated_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+    updated_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (session_id, challenge_id)
+);
+
+
+-- Condiciones que hay que aceptar al entrar (se cargan desde data/consent.yaml con
+-- "Cargar condiciones" en admin.html)
+
+-- Textos del diálogo y de la página de rechazo, en filas clave-valor:
+--   title, intro, rejected_title, rejected_text
+CREATE TABLE IF NOT EXISTS consent_page (
+    key   TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+);
+
+
+-- Cada condición (una casilla), en el orden del YAML
+CREATE TABLE IF NOT EXISTS consent_conditions (
+    position INTEGER PRIMARY KEY,
+    text     TEXT NOT NULL
 );

@@ -38,28 +38,26 @@ export async function login(username: string, password: string): Promise<string>
   return (await r.json()).token
 }
 
-export interface AdminDay {
-  id: number
-  attempts_left: number
-  type_label: string
-}
-
 export interface PlayerSession {
   id: number
   created_at: string
   last_seen_at: string
+  closed_at: string | null
   unlocked_days: number[]
+  blocked_days: number[]
+  challenges_success: number
+  challenges_fail: number
+  challenges_ignore: number
 }
 
-export interface ChallengesSummary {
-  total: number
-  success: number
-  fail: number
-  ignore: number
-  pending: number
+export interface PlayerDetail {
+  id: number
+  max_attempts: number
+  days: { id: number; type_label: string; attempts_left: number; unlocked_at: string | null }[]
+  challenges: { id: string; status: 'success' | 'fail' | 'ignore' | null; updated_at: string | null }[]
 }
 
-export type UploadKind = 'days' | 'welcome' | 'challenges'
+export type UploadKind = 'days' | 'welcome' | 'challenges' | 'consent'
 
 // Crea un cliente que añade el token a cada petición
 export function adminApi(token: string) {
@@ -80,13 +78,13 @@ export function adminApi(token: string) {
 
   return {
     logout: () => call('/logout', { method: 'POST' }),
-    days: () => call<{ max_attempts: number; days: AdminDay[] }>('/days'),
-    resetDay: (id: number) => call(`/days/${id}/reset`, { method: 'POST' }),
-    blockDay: (id: number) => call(`/days/${id}/block`, { method: 'POST' }),
-    players: () => call<{ players: PlayerSession[] }>('/players'),
+    // Sesiones de jugador: cada una tiene su estado de días y de pruebas
+    players: () => call<{ challenges_total: number; players: PlayerSession[] }>('/players'),
+    player: (id: number) => call<PlayerDetail>(`/players/${id}`),
+    resetPlayerDay: (id: number, day: number) => call(`/players/${id}/days/${day}/reset`, { method: 'POST' }),
+    blockPlayerDay: (id: number, day: number) => call(`/players/${id}/days/${day}/block`, { method: 'POST' }),
+    resetPlayerChallenges: (id: number) => call(`/players/${id}/challenges/reset`, { method: 'POST' }),
     closePlayer: (id: number) => call(`/players/${id}`, { method: 'DELETE' }),
-    challenges: () => call<ChallengesSummary>('/challenges'),
-    resetChallenges: () => call('/challenges/reset', { method: 'POST' }),
     upload: (kind: UploadKind, content: string) =>
       call<Record<string, number>>(`/${kind}/upload`, { method: 'POST', json: { content } }),
   }

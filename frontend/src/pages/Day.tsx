@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { PasswordInput } from '@/components/PasswordInput'
 import { fetchDay, unlockDay, type DayContent } from '@/lib/api'
+import { useConsent } from '@/lib/consent'
 
 type Phase =
   | { name: 'loading' }
@@ -24,6 +25,7 @@ export default function Day() {
   const [wrong, setWrong] = useState(false)
   const [sending, setSending] = useState(false)
   const shake = useAnimationControls()
+  const { requireConsent } = useConsent()
 
   useEffect(() => {
     setPhase({ name: 'loading' })
@@ -44,6 +46,7 @@ export default function Day() {
     setWrong(false)
     try {
       const result = await unlockDay(id, password)
+      if (result.kind === 'no-session') return requireConsent()
       if (result.kind === 'blocked') setPhase({ name: 'blocked' })
       if (result.kind === 'wrong') {
         setWrong(true)

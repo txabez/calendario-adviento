@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { motion } from 'motion/react'
-import { FileUp, Loader2, Lock, LogOut, RotateCcw, ShieldCheck, Trash2 } from 'lucide-react'
+import { FileUp, Loader2, Lock, LockOpen, LogOut, RotateCcw, Settings2, ShieldCheck, Trash2, Trophy } from 'lucide-react'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ConfirmButton } from '@/components/ConfirmButton'
 import { Page } from '@/components/Page'
 import { PasswordInput } from '@/components/PasswordInput'
@@ -19,8 +20,7 @@ import {
   login,
   saveAdminToken,
   type AdminApi,
-  type AdminDay,
-  type ChallengesSummary,
+  type PlayerDetail,
   type PlayerSession,
   type UploadKind,
 } from '@/lib/admin-api'
@@ -124,16 +124,22 @@ function Section({ title, description, children }: { title: string; description?
 
 type UploadResult = { ok: boolean; text: string; errors?: string[] }
 
+const STATUS_LABELS = {
+  success: { label: 'Superada', className: 'border-success text-success' },
+  fail: { label: 'Fallida', className: 'border-destructive text-destructive' },
+  ignore: { label: 'Ignorada', className: 'text-muted-foreground' },
+} as const
+
 function Panel({ token, onLogout }: { token: string; onLogout: () => void }) {
   const api = useMemo(() => adminApi(token), [token])
   const [error, setError] = useState<string | null>(null)
-  const [days, setDays] = useState<{ max: number; list: AdminDay[] } | null>(null)
-  const [players, setPlayers] = useState<PlayerSession[] | null>(null)
-  const [challenges, setChallenges] = useState<ChallengesSummary | null>(null)
+  const [players, setPlayers] = useState<{ total: number; list: PlayerSession[] } | null>(null)
+  const [open, setOpen] = useState<number | null>(null) // sesión desplegada
   const [busy, setBusy] = useState<string | null>(null)
   const [upload, setUpload] = useState<UploadResult | null>(null)
+  const [version, setVersion] = useState(0) // cambia tras cada acción para recargar el detalle
 
-  // Ejecuta una llamada; si la sesión caduca, vuelve al login
+  // Ejecuta una llamada; si la sesión de admin caduca, vuelve al login
   const run = useCallback(
     async <T,>(key: string | null, action: (api: AdminApi) => Promise<T>) => {
       setBusy(key)
@@ -141,7 +147,7 @@ function Panel({ token, onLogout }: { token: string; onLogout: () => void }) {
         return await action(api)
       } catch (e) {
         if (e instanceof SessionExpiredError) onLogout()
-        else setError((e as Error).message)
+        else if (!(e instanceof YamlErrors)) setError((e as Error).message)
         throw e
       } finally {
         setBusy(null)
@@ -151,12 +157,10 @@ function Panel({ token, onLogout }: { token: string; onLogout: () => void }) {
   )
 
   const refresh = useCallback(() => {
-    run(null, async (a) => {
-      const [d, p, c] = await Promise.all([a.days(), a.players(), a.challenges()])
-      setDays({ max: d.max_attempts, list: d.days })
-      setPlayers(p.players)
-      setChallenges(c)
-    }).catch(() => {})
+    setVersion((v) => v + 1)
+    run(null, (a) => a.players())
+      .then((p) => setPlayers({ total: p.challenges_total, list: p.players }))
+      .catch(() => {})
   }, [run])
 
   useEffect(refresh, [refresh])
@@ -172,10 +176,7 @@ function Panel({ token, onLogout }: { token: string; onLogout: () => void }) {
       setUpload({ ok: true, text: `${file.name}: ${describe(result)}` })
       refresh()
     } catch (e) {
-      if (e instanceof YamlErrors) {
-        setError(null)
-        setUpload({ ok: false, text: `${file.name}: ${e.message}`, errors: e.errors })
-      }
+      if (e instanceof YamlErrors) setUpload({ ok: false, text: `${file.name}: ${e.message}`, errors: e.errors })
     }
   }
 
@@ -216,6 +217,11 @@ function Panel({ token, onLogout }: { token: string; onLogout: () => void }) {
             onFile={(f) => uploadYaml('welcome', f, (r) => `bienvenida cargada (${r.sections} secciones)`)}
           />
           <YamlButton
+            label="Cargar condiciones"
+            busy={busy === 'upload-consent'}
+            onFile={(f) => uploadYaml('consent', f, (r) => `cargadas ${r.conditions} condiciones`)}
+          />
+          <YamlButton
             label="Cargar pruebas"
             busy={busy === 'upload-challenges'}
             onFile={(f) =>
@@ -239,43 +245,155 @@ function Panel({ token, onLogout }: { token: string; onLogout: () => void }) {
         )}
       </Section>
 
-      <Section title="Días">
-        {!days && <Loader2 className="size-6 animate-spin text-muted-foreground" />}
-        {days && (
+      <Section
+        title="Sesiones de jugador"
+        description="Cada navegador que ha aceptado las condiciones. Cada sesión tiene sus propios intentos, días abiertos y pruebas."
+      >
+        {!players && <Loader2 className="size-6 animate-spin text-muted-foreground" />}
+        {players && players.list.length === 0 && (
+          <p className="text-muted-foreground">Nadie ha aceptado todavía las condiciones.</p>
+        )}
+        {players && players.list.length > 0 && (
+          <ul className="flex flex-col gap-3">
+            {players.list.map((p) => {
+              const played = p.challenges_success + p.challenges_fail + p.challenges_ignore
+              const expanded = open === p.id
+              return (
+                <li key={p.id} className={cn('rounded-xl border transition-colors', expanded && 'border-primary')}>
+                  <div className="flex flex-wrap items-center gap-3 p-3">
+                    <span className="w-10 text-right font-display text-lg text-muted-foreground">#{p.id}</span>
+                    <div className="flex min-w-0 flex-1 flex-col gap-1">
+                      <div className="flex flex-wrap gap-1.5">
+                        {p.closed_at && (
+                          <Badge variant="secondary">
+                            <LogOut /> Cerrada
+                          </Badge>
+                        )}
+                        <Badge variant="outline">
+                          <LockOpen /> {p.unlocked_days.length} abiertos
+                        </Badge>
+                        {p.blocked_days.length > 0 && (
+                          <Badge variant="destructive">
+                            <Lock /> {p.blocked_days.length} bloqueados
+                          </Badge>
+                        )}
+                        <Badge variant="outline" className="text-muted-foreground">
+                          <Trophy /> {played}/{players.total} pruebas
+                        </Badge>
+                      </div>
+                      <span className="text-xs text-muted-foreground">
+                        Aceptó las condiciones: {formatDate(p.created_at)} ·{' '}
+                        {p.closed_at
+                          ? `Cerrada por el jugador: ${formatDate(p.closed_at)}`
+                          : `Última actividad: ${formatDate(p.last_seen_at)}`}
+                      </span>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button size="sm" variant={expanded ? 'default' : 'outline'} onClick={() => setOpen(expanded ? null : p.id)}>
+                        <Settings2 /> Gestionar
+                      </Button>
+                      <ConfirmButton
+                        size="sm"
+                        variant="outline"
+                        className="text-destructive"
+                        disabled={busy === `player-${p.id}`}
+                        title={`¿Cancelar la sesión #${p.id}?`}
+                        description="Se borra todo su estado (días e intentos, y pruebas). Ese navegador tendrá que volver a aceptar las condiciones y empezar de cero."
+                        confirmLabel="Cancelar sesión"
+                        onConfirm={() => act(`player-${p.id}`, (a) => a.closePlayer(p.id))}
+                      >
+                        <Trash2 /> Cancelar
+                      </ConfirmButton>
+                    </div>
+                  </div>
+                  {expanded && (
+                    <PlayerManager key={`${p.id}-${version}`} id={p.id} run={run} act={act} busy={busy} />
+                  )}
+                </li>
+              )
+            })}
+          </ul>
+        )}
+      </Section>
+    </Page>
+  )
+}
+
+// Días y pruebas de una sesión de jugador
+function PlayerManager({
+  id,
+  run,
+  act,
+  busy,
+}: {
+  id: number
+  run: <T>(key: string | null, action: (a: AdminApi) => Promise<T>) => Promise<T>
+  act: (key: string, action: (a: AdminApi) => Promise<unknown>) => void
+  busy: string | null
+}) {
+  const [detail, setDetail] = useState<PlayerDetail | null>(null)
+
+  useEffect(() => {
+    run(null, (a) => a.player(id))
+      .then(setDetail)
+      .catch(() => {})
+  }, [id, run])
+
+  if (!detail)
+    return (
+      <div className="border-t p-4">
+        <Loader2 className="size-5 animate-spin text-muted-foreground" />
+      </div>
+    )
+
+  const played = detail.challenges.filter((c) => c.status).length
+
+  return (
+    <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="border-t p-3">
+      <Tabs defaultValue="days">
+        <TabsList className="w-full">
+          <TabsTrigger value="days">Días</TabsTrigger>
+          <TabsTrigger value="challenges">Pruebas</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="days">
           <ul className="flex flex-col">
-            {days.list.map((day, i) => {
+            {detail.days.map((day, i) => {
               const blocked = day.attempts_left <= 0
-              const full = day.attempts_left >= days.max
+              const full = day.attempts_left >= detail.max_attempts
+              const key = `day-${id}-${day.id}`
               return (
                 <li key={day.id}>
                   {i > 0 && <Separator />}
-                  <div className="flex items-center gap-3 py-3">
-                    <span
-                      className={cn(
-                        'w-8 text-right font-display text-xl',
-                        blocked ? 'text-destructive' : 'text-foreground',
-                      )}
-                    >
-                      {day.id}
-                    </span>
+                  <div className="flex items-center gap-3 py-2.5">
+                    <span className={cn('w-7 text-right font-display text-lg', blocked && 'text-destructive')}>{day.id}</span>
                     <div className="flex min-w-0 flex-1 flex-col gap-1">
-                      <span className="truncate text-sm font-medium">{day.type_label}</span>
-                      {blocked ? (
-                        <Badge variant="destructive" className="gap-1">
-                          <Lock /> Bloqueado
-                        </Badge>
-                      ) : (
-                        <Badge variant="outline" className="text-muted-foreground">
-                          Intentos: {day.attempts_left}/{days.max}
-                        </Badge>
-                      )}
+                      <span className="truncate text-sm">{day.type_label}</span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {blocked ? (
+                          <Badge variant="destructive">
+                            <Lock /> Bloqueado
+                          </Badge>
+                        ) : (
+                          <>
+                            {day.unlocked_at && (
+                              <Badge>
+                                <LockOpen /> Abierto
+                              </Badge>
+                            )}
+                            <Badge variant="outline" className="text-muted-foreground">
+                              Intentos: {day.attempts_left}/{detail.max_attempts}
+                            </Badge>
+                          </>
+                        )}
+                      </div>
                     </div>
                     <div className="flex flex-wrap justify-end gap-2">
                       <Button
                         size="sm"
                         variant="outline"
-                        disabled={full || busy === `day-${day.id}`}
-                        onClick={() => act(`day-${day.id}`, (a) => a.resetDay(day.id))}
+                        disabled={full || busy === key}
+                        onClick={() => act(key, (a) => a.resetPlayerDay(id, day.id))}
                       >
                         <RotateCcw /> Resetear
                       </Button>
@@ -283,8 +401,8 @@ function Panel({ token, onLogout }: { token: string; onLogout: () => void }) {
                         size="sm"
                         variant="outline"
                         className="text-destructive"
-                        disabled={blocked || busy === `day-${day.id}`}
-                        onClick={() => act(`day-${day.id}`, (a) => a.blockDay(day.id))}
+                        disabled={blocked || busy === key}
+                        onClick={() => act(key, (a) => a.blockPlayerDay(id, day.id))}
                       >
                         <Lock /> Bloquear
                       </Button>
@@ -294,80 +412,42 @@ function Panel({ token, onLogout }: { token: string; onLogout: () => void }) {
               )
             })}
           </ul>
-        )}
-      </Section>
+        </TabsContent>
 
-      <Section title="Juego de pruebas">
-        {!challenges && <Loader2 className="size-6 animate-spin text-muted-foreground" />}
-        {challenges && challenges.total === 0 && <p className="text-muted-foreground">No hay pruebas cargadas.</p>}
-        {challenges && challenges.total > 0 && (
-          <div className="flex flex-col gap-4">
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-              {(
-                [
-                  ['Superadas', challenges.success, 'text-success'],
-                  ['Fallidas', challenges.fail, 'text-destructive'],
-                  ['Ignoradas', challenges.ignore, 'text-muted-foreground'],
-                  ['Pendientes', challenges.pending, 'text-foreground'],
-                ] as const
-              ).map(([label, value, color]) => (
-                <div key={label} className="rounded-lg border bg-background/40 p-3 text-center">
-                  <div className={cn('font-display text-2xl', color)}>{value}</div>
-                  <div className="text-xs text-muted-foreground">{label}</div>
-                </div>
-              ))}
-            </div>
+        <TabsContent value="challenges">
+          {detail.challenges.length === 0 && <p className="py-2 text-muted-foreground">No hay pruebas cargadas.</p>}
+          <ul className="flex flex-col">
+            {detail.challenges.map((c, i) => {
+              const status = c.status ? STATUS_LABELS[c.status] : null
+              return (
+                <li key={c.id}>
+                  {i > 0 && <Separator />}
+                  <div className="flex items-center gap-3 py-2.5">
+                    <span className="min-w-7 text-right font-display text-lg break-all">{c.id}</span>
+                    <Badge variant="outline" className={status ? status.className : 'text-muted-foreground'}>
+                      {status ? status.label : 'Pendiente'}
+                    </Badge>
+                  </div>
+                </li>
+              )
+            })}
+          </ul>
+          {detail.challenges.length > 0 && (
             <ConfirmButton
               variant="outline"
-              className="self-start"
-              disabled={busy === 'challenges' || challenges.pending === challenges.total}
-              title="¿Resetear todas las pruebas?"
-              description="Todas las pruebas volverán a estar pendientes. Las pruebas no se borran."
+              className="mt-3"
+              disabled={busy === `challenges-${id}` || played === 0}
+              title={`¿Resetear las pruebas de la sesión #${id}?`}
+              description="Todas sus pruebas volverán a estar pendientes. Las de las demás sesiones no cambian."
               confirmLabel="Resetear"
-              onConfirm={() => act('challenges', (a) => a.resetChallenges())}
+              onConfirm={() => act(`challenges-${id}`, (a) => a.resetPlayerChallenges(id))}
             >
               <RotateCcw /> Resetear pruebas
             </ConfirmButton>
-          </div>
-        )}
-      </Section>
-
-      <Section title="Sesiones de jugador" description="Cada navegador que ha abierto algún día.">
-        {!players && <Loader2 className="size-6 animate-spin text-muted-foreground" />}
-        {players && players.length === 0 && <p className="text-muted-foreground">Todavía no se ha abierto ningún día.</p>}
-        {players && players.length > 0 && (
-          <ul className="flex flex-col">
-            {players.map((p, i) => (
-              <li key={p.id}>
-                {i > 0 && <Separator />}
-                <div className="flex items-center gap-3 py-3">
-                  <span className="w-10 text-right font-display text-lg text-muted-foreground">#{p.id}</span>
-                  <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                    <span className="text-sm font-medium">
-                      {p.unlocked_days.length ? `Días abiertos: ${p.unlocked_days.join(', ')}` : 'Sin días abiertos'}
-                    </span>
-                    <span className="text-xs text-muted-foreground">Inicio: {formatDate(p.created_at)}</span>
-                    <span className="text-xs text-muted-foreground">Última actividad: {formatDate(p.last_seen_at)}</span>
-                  </div>
-                  <ConfirmButton
-                    size="sm"
-                    variant="outline"
-                    className="text-destructive"
-                    disabled={busy === `player-${p.id}`}
-                    title={`¿Cancelar la sesión #${p.id}?`}
-                    description="Sus días volverán a pedir la contraseña."
-                    confirmLabel="Cancelar sesión"
-                    onConfirm={() => act(`player-${p.id}`, (a) => a.closePlayer(p.id))}
-                  >
-                    <Trash2 /> Cancelar
-                  </ConfirmButton>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </Section>
-    </Page>
+          )}
+        </TabsContent>
+      </Tabs>
+    </motion.div>
   )
 }
 

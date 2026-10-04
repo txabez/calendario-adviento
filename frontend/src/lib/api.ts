@@ -10,12 +10,62 @@ export function getPlayerToken(): string {
   }
 }
 
-function setPlayerToken(token: string) {
+export function setPlayerToken(token: string | null) {
   try {
-    localStorage.setItem(PLAYER_KEY, token)
+    if (token) localStorage.setItem(PLAYER_KEY, token)
+    else localStorage.removeItem(PLAYER_KEY)
   } catch {
-    // Sin almacenamiento: los días se recuerdan solo mientras la página esté abierta
+    // Sin almacenamiento: la sesión solo dura mientras la página esté abierta
   }
+}
+
+// --- Sesión de jugador (aceptación de las condiciones) --------------------------
+
+export interface PlayerSessionInfo {
+  id: number
+  created_at: string
+}
+
+// Datos de la sesión del token guardado, o null si no hay sesión abierta
+export async function checkPlayerSession(): Promise<PlayerSessionInfo | null> {
+  if (!getPlayerToken()) return null
+  const r = await fetch('/api/player/session', { headers: playerHeaders() })
+  if (!r.ok) throw new Error('No se ha podido comprobar la sesión.')
+  const data = await r.json()
+  return data.valid ? { id: data.id, created_at: data.created_at } : null
+}
+
+// Cierra la sesión de jugador (logout) y olvida su token
+export async function closePlayerSession(): Promise<void> {
+  const r = await fetch('/api/player/session', { method: 'DELETE', headers: playerHeaders() })
+  // 403: ya no estaba abierta (p. ej. la canceló el administrador); se olvida igualmente
+  if (!r.ok && r.status !== 403) throw new Error('No se ha podido cerrar la sesión.')
+  setPlayerToken(null)
+}
+
+export interface ConsentTexts {
+  title: string | null
+  intro: string | null
+  conditions: { id: number; text: string }[]
+  rejected: { title: string | null; text: string | null }
+}
+
+// Textos del diálogo de condiciones y de la página de rechazo (de consent.yaml)
+export async function fetchConsent(): Promise<ConsentTexts> {
+  const r = await fetch('/api/player/consent')
+  if (!r.ok) throw new Error('No se han podido cargar las condiciones.')
+  return r.json()
+}
+
+// Acepta las condiciones: crea la sesión de jugador y guarda su token
+export async function acceptConditions(accepted: number[]): Promise<void> {
+  const r = await fetch('/api/player/session', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ accepted }),
+  })
+  if (!r.ok) throw new Error('No se ha podido registrar la aceptación.')
+  setPlayerToken((await r.json()).player_token)
 }
 
 export interface DayStatus {
@@ -49,8 +99,12 @@ export type UnlockResult =
   | { kind: 'open'; content: DayContent }
   | { kind: 'wrong'; attemptsLeft: number }
   | { kind: 'blocked' }
+  | { kind: 'no-session' } // la sesión no existe (p. ej. la canceló el administrador)
 
 export class NotFoundError extends Error {}
+
+// La sesión de jugador no existe (p. ej. la canceló el administrador)
+export class NoSessionError extends Error {}
 
 const playerHeaders = () => ({ 'X-Player-Token': getPlayerToken() })
 
@@ -74,14 +128,13 @@ export async function unlockDay(id: string, password: string): Promise<UnlockRes
     body: JSON.stringify({ password }),
   })
   if (r.status === 423) return { kind: 'blocked' }
+  if (r.status === 403) return { kind: 'no-session' }
   if (r.status === 401) {
     const data = await r.json()
     return { kind: 'wrong', attemptsLeft: data.detail.attempts_left }
   }
   if (!r.ok) throw new Error('No se ha podido abrir el día.')
-  const { player_token, ...content } = await r.json()
-  setPlayerToken(player_token)
-  return { kind: 'open', content }
+  return { kind: 'open', content: await r.json() }
 }
 
 // --- Bienvenida -----------------------------------------------------------------
@@ -123,13 +176,13 @@ export interface Challenge {
 }
 
 export async function fetchChallenges(): Promise<ChallengeGame> {
-  const r = await fetch('/api/challenges')
+  const r = await fetch('/api/challenges', { headers: playerHeaders() })
   if (!r.ok) throw new Error('No se ha podido cargar el juego de pruebas.')
   return r.json()
 }
 
 export async function fetchChallenge(id: string): Promise<Challenge> {
-  const r = await fetch(`/api/challenges/${encodeURIComponent(id)}`)
+  const r = await fetch(`/api/challenges/${encodeURIComponent(id)}`, { headers: playerHeaders() })
   if (r.status === 404) throw new NotFoundError('Esta prueba no existe.')
   if (!r.ok) throw new Error('No se ha podido cargar la prueba.')
   return r.json()
@@ -138,8 +191,9 @@ export async function fetchChallenge(id: string): Promise<Challenge> {
 export async function setChallengeStatus(id: string, status: ChallengeStatus): Promise<void> {
   const r = await fetch(`/api/challenges/${encodeURIComponent(id)}/status`, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...playerHeaders() },
     body: JSON.stringify({ status }),
   })
+  if (r.status === 403) throw new NoSessionError('Hay que aceptar las condiciones.')
   if (!r.ok) throw new Error('No se ha podido guardar el estado.')
 }

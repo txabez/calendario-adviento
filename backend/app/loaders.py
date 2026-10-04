@@ -1,7 +1,7 @@
 """
 Validación y carga en base de datos de los YAML de contenido.
 
-Se usan desde el panel de administración (días, bienvenida y pruebas): si el
+Se usan desde el panel de administración (días, bienvenida, pruebas y condiciones): si el
 YAML tiene errores se lanza YamlError con la lista de problemas y no se carga nada.
 """
 import yaml
@@ -265,3 +265,63 @@ def load_challenges(text):
         deleted = conn.execute("DELETE FROM challenges WHERE NOT (id = ANY(%s))", (ids,)).rowcount
 
     return {"loaded": len(ids), "deleted": deleted}
+
+
+# --- Condiciones de entrada -----------------------------------------------------
+
+
+def validate_consent(data):
+    if not isinstance(data, dict):
+        return ["el fichero está vacío o no tiene el formato esperado"]
+    errors = []
+    if not is_text(data.get("title")):
+        errors.append("falta 'title'")
+    if data.get("intro") is not None and not is_text(data["intro"]):
+        errors.append("'intro' debe ser un texto")
+
+    conditions = data.get("conditions")
+    if not isinstance(conditions, list) or not conditions:
+        errors.append("falta la lista 'conditions' con al menos una condición")
+    else:
+        for i, condition in enumerate(conditions, start=1):
+            if not is_text(condition):
+                errors.append(f"condición {i}: debe ser un texto")
+
+    rejected = data.get("rejected")
+    if rejected is not None:
+        if not isinstance(rejected, dict):
+            errors.append("'rejected' debe tener 'title' y 'text'")
+        else:
+            for field in ("title", "text"):
+                if not is_text(rejected.get(field)):
+                    errors.append(f"rejected: falta '{field}'")
+    return errors
+
+
+def load_consent(text):
+    """Deja las tablas consent_page y consent_conditions igual que el YAML."""
+    data = parse_yaml(text)
+    errors = validate_consent(data)
+    if errors:
+        raise YamlError(errors)
+
+    page = {"title": data["title"], "intro": data.get("intro")}
+    if data.get("rejected"):
+        page["rejected_title"] = data["rejected"]["title"]
+        page["rejected_text"] = data["rejected"]["text"]
+
+    with connect() as conn:
+        conn.execute("DELETE FROM consent_page")
+        for key, value in page.items():
+            if value:
+                conn.execute(
+                    "INSERT INTO consent_page (key, value) VALUES (%s, %s)", (key, value.strip())
+                )
+        conn.execute("DELETE FROM consent_conditions")
+        for position, condition in enumerate(data["conditions"], start=1):
+            conn.execute(
+                "INSERT INTO consent_conditions (position, text) VALUES (%s, %s)",
+                (position, condition.strip()),
+            )
+
+    return {"conditions": len(data["conditions"])}
